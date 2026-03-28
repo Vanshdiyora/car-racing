@@ -1,14 +1,17 @@
 """Human keyboard control for the race.
 
-Reads Pygame key state and maps to discrete CarRacing actions:
-  0 = do nothing
-  1 = steer left
-  2 = steer right
-  3 = accelerate
-  4 = brake
+Returns continuous actions: [steering, gas, brake]
+  steering: -1.0 (full left) to +1.0 (full right)
+  gas:       0.0 to 1.0
+  brake:     0.0 to 1.0
+
+Multiple keys can be held simultaneously (e.g. gas + steer).
+Values ramp smoothly for a real driving feel.
 """
 
 from __future__ import annotations
+
+import numpy as np
 
 try:
     import pygame
@@ -35,9 +38,17 @@ _KEY_LOOKUP = {
     "D": getattr(pygame, "K_d", None) if pygame else None,
 }
 
+# Smooth ramping parameters
+_STEER_SPEED = 0.08      # how fast steering ramps per frame
+_STEER_DECAY = 0.12      # how fast steering returns to centre
+_GAS_SPEED = 0.10        # how fast gas ramps up
+_GAS_DECAY = 0.15        # how fast gas falls off
+_BRAKE_SPEED = 0.15      # brake ramp up
+_BRAKE_DECAY = 0.20      # brake ramp down
+
 
 class HumanController:
-    """Read keyboard input from a Pygame display and convert to discrete actions."""
+    """Read keyboard input and produce smooth continuous actions."""
 
     def __init__(self, key_map: dict[str, str] | None = None) -> None:
         if pygame is None:
@@ -46,29 +57,51 @@ class HumanController:
         self._resolve_keys()
         self.quit_requested = False
 
+        # Smooth internal state
+        self._steer: float = 0.0
+        self._gas: float = 0.0
+        self._brake: float = 0.0
+
     def _resolve_keys(self) -> None:
         self._accel = _KEY_LOOKUP.get(self._map["accelerate"])
-        self._brake = _KEY_LOOKUP.get(self._map["brake"])
+        self._brake_key = _KEY_LOOKUP.get(self._map["brake"])
         self._left = _KEY_LOOKUP.get(self._map["steer_left"])
         self._right = _KEY_LOOKUP.get(self._map["steer_right"])
 
-    def get_action(self) -> int:
-        """Poll key state and return the discrete action."""
+    def get_action(self) -> np.ndarray:
+        """Poll key state and return continuous action [steering, gas, brake]."""
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 self.quit_requested = True
-                return 0
+                return np.array([0.0, 0.0, 0.0], dtype=np.float32)
             if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
                 self.quit_requested = True
-                return 0
+                return np.array([0.0, 0.0, 0.0], dtype=np.float32)
 
         keys = pygame.key.get_pressed()
-        if keys[self._accel]:
-            return 3  # accelerate
-        if keys[self._brake]:
-            return 4  # brake
+
+        # --- Steering (smooth ramp + auto-centre) ---
         if keys[self._left]:
-            return 1  # steer left
-        if keys[self._right]:
-            return 2  # steer right
-        return 0  # do nothing
+            self._steer = max(-1.0, self._steer - _STEER_SPEED)
+        elif keys[self._right]:
+            self._steer = min(1.0, self._steer + _STEER_SPEED)
+        else:
+            # Auto-centre towards 0
+            if self._steer > 0:
+                self._steer = max(0.0, self._steer - _STEER_DECAY)
+            elif self._steer < 0:
+                self._steer = min(0.0, self._steer + _STEER_DECAY)
+
+        # --- Gas (smooth ramp) ---
+        if keys[self._accel]:
+            self._gas = min(1.0, self._gas + _GAS_SPEED)
+        else:
+            self._gas = max(0.0, self._gas - _GAS_DECAY)
+
+        # --- Brake (smooth ramp) ---
+        if keys[self._brake_key]:
+            self._brake = min(1.0, self._brake + _BRAKE_SPEED)
+        else:
+            self._brake = max(0.0, self._brake - _BRAKE_DECAY)
+
+        return np.array([self._steer, self._gas, self._brake], dtype=np.float32)

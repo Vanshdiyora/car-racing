@@ -74,6 +74,26 @@ def make_env(
     return env
 
 
+def make_race_env(
+    seed: int = 42,
+    continuous: bool = True,
+    max_episode_steps: int = 10_000,
+) -> gym.Env:
+    """Create a raw CarRacing env for race mode — no wrappers, no frame skip.
+
+    Human plays on a continuous-action env for natural driving feel.
+    Returns RGB frames directly via ``env.render()``.
+    """
+    env = gym.make(
+        "CarRacing-v3",
+        continuous=continuous,
+        render_mode="rgb_array",
+        max_episode_steps=max_episode_steps,
+    )
+    env.reset(seed=seed)
+    return env
+
+
 def make_vec_env(
     env_cfg: dict[str, Any],
     n_envs: int,

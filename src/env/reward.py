@@ -61,9 +61,9 @@ class RewardShaper(gym.Wrapper):
                 if speed < 1.0 and self._step_count > 10:
                     shaped_reward += self._still_pen
 
-                # Grass detection via wheel contact
+                # Grass detection — wheel.tiles is empty when on grass
                 on_grass = any(
-                    getattr(w, "is_off_track", False) or (hasattr(w, "grass") and w.grass)
+                    len(getattr(w, "tiles", {1})) == 0
                     for w in car.wheels
                 )
                 if on_grass:

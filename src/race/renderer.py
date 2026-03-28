@@ -46,28 +46,40 @@ class RaceRenderer:
         """Draw a single frame with optional HUD overlays."""
         self._screen.fill((30, 30, 30))
         half_w = self._width // 2
+        panel_h = self._height - 100  # leave room for HUD at bottom
 
         # Left panel — Human
         if human_frame is not None:
-            surf = self._array_to_surface(human_frame, (half_w - 10, self._height - 60))
+            surf = self._array_to_surface(human_frame, (half_w - 10, panel_h))
             self._screen.blit(surf, (5, 50))
         self._draw_label("HUMAN", half_w // 2 - 40, 10, (100, 200, 255))
 
         # Right panel — AI
         if ai_frame is not None:
-            surf = self._array_to_surface(ai_frame, (half_w - 10, self._height - 60))
+            surf = self._array_to_surface(ai_frame, (half_w - 10, panel_h))
             self._screen.blit(surf, (half_w + 5, 50))
         self._draw_label("AI (PPO)", half_w + half_w // 2 - 50, 10, (255, 100, 100))
 
         # Divider
         pygame.draw.line(self._screen, (200, 200, 200), (half_w, 0), (half_w, self._height), 2)
 
-        # HUD
+        # HUD — bottom bar
+        hud_y = self._height - 48
         if self._show_hud:
+            # Dark bar background
+            pygame.draw.rect(self._screen, (20, 20, 20), (0, hud_y - 5, self._width, 55))
+            pygame.draw.line(self._screen, (80, 80, 80), (0, hud_y - 5), (self._width, hud_y - 5), 1)
+
             if human_metrics:
-                self._draw_hud(human_metrics, x=10, y=self._height - 45)
+                self._draw_race_hud(human_metrics, x=10, y=hud_y, colour=(100, 200, 255))
             if ai_metrics:
-                self._draw_hud(ai_metrics, x=half_w + 10, y=self._height - 45)
+                self._draw_race_hud(ai_metrics, x=half_w + 10, y=hud_y, colour=(255, 100, 100))
+
+            # Centred timer
+            elapsed = human_metrics.get("elapsed", 0.0) if human_metrics else 0.0
+            mins = int(elapsed) // 60
+            secs = int(elapsed) % 60
+            self._draw_text(f"{mins:02d}:{secs:02d}", half_w - 22, 12, (255, 255, 100), self._font)
 
         pygame.display.flip()
         self._clock.tick(self._fps)
@@ -128,10 +140,28 @@ class RaceRenderer:
     def _draw_label(self, text: str, x: int, y: int, colour: tuple) -> None:
         self._draw_text(text, x, y, colour, self._big_font)
 
+    def _draw_race_hud(self, metrics: dict[str, Any], x: int, y: int, colour: tuple) -> None:
+        """Draw a rich HUD row: Speed | Track% | Reward | Grass indicator."""
+        speed = metrics.get("speed", 0.0)
+        track_pct = metrics.get("track_pct", 0.0)
+        reward = metrics.get("total_reward", 0.0)
+        on_grass = metrics.get("on_grass", False)
+
+        # Speed
+        self._draw_text(f"SPD:{speed:5.1f}", x, y, colour)
+        # Track completion
+        self._draw_text(f"Track:{track_pct:5.1f}%", x + 120, y, (200, 200, 200))
+        # Reward
+        r_col = (100, 255, 100) if reward >= 0 else (255, 80, 80)
+        self._draw_text(f"R:{reward:+.0f}", x + 270, y, r_col)
+        # Grass warning
+        if on_grass:
+            self._draw_text("GRASS!", x + 380, y, (255, 50, 50))
+
     def _draw_hud(self, metrics: dict[str, Any], x: int, y: int) -> None:
+        """Legacy HUD — fallback for non-race screens."""
         parts = [f"R:{metrics.get('total_reward', 0):.0f}"]
         parts.append(f"Steps:{metrics.get('steps', 0)}")
-        parts.append(f"Laps:{metrics.get('laps_completed', 0)}")
         text = "  |  ".join(parts)
         self._draw_text(text, x, y, (200, 200, 200))
 
