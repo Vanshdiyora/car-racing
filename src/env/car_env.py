@@ -41,7 +41,7 @@ def make_env(
         e.get("name", "CarRacing-v3"),
         continuous=e.get("continuous", False),
         render_mode=render_mode,
-        max_episode_steps=e.get("max_episode_steps", 1000),
+        max_episode_steps=e.get("max_episode_steps", 1000000),
     )
 
     # Frame skip

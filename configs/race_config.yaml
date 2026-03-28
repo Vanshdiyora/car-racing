@@ -1,7 +1,7 @@
 # Human vs AI race configuration
 race:
   mode: "human_vs_ai"           # "human_vs_ai", "ai_only", "human_only"
-  ai_model_path: "models/ppo_best/best_model.zip"
+  ai_model_path: "models/ppo_best/best_model.pt"
   n_laps: 3
   max_time_seconds: 300
   fps: 60
