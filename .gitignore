@@ -1,0 +1,29 @@
+# Byte-compiled / optimised
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+
+# Training outputs
+models/
+logs/
+outputs/
+runs/
+checkpoints/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Jupyter
+.ipynb_checkpoints/
