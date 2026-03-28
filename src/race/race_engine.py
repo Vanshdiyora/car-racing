@@ -34,6 +34,24 @@ def _get_car_speed(env: gym.Env) -> float:
     return float(np.sqrt(vx ** 2 + vy ** 2))
 
 
+def _get_car_pose(env: gym.Env) -> tuple[float, float, float]:
+    """Return (x, y, angle) of the car in world coordinates."""
+    car = getattr(env.unwrapped, "car", None)
+    if car is None:
+        return 0.0, 0.0, 0.0
+    return (
+        float(car.hull.position[0]),
+        float(car.hull.position[1]),
+        float(car.hull.angle),
+    )
+
+
+def _get_track_waypoints(env: gym.Env) -> list[tuple[float, float]]:
+    """Return the track centre-line as [(x, y), ...] for minimap drawing."""
+    track = getattr(env.unwrapped, "track", [])
+    return [(t[2], t[3]) for t in track]
+
+
 def _is_on_grass(env: gym.Env) -> bool:
     """Check if any wheel is off the road (empty tiles set = on grass)."""
     car = getattr(env.unwrapped, "car", None)
@@ -73,11 +91,35 @@ def run_race(
     logger.info("Track seed: %d", seed)
     max_time = r.get("max_time_seconds", 300)
 
-    # ---- Environments ----
-    # Human: raw continuous env (no wrappers, no frame skip) for real gameplay
-    human_env = make_race_env(seed=seed, continuous=True, max_episode_steps=max_time * fps)
+    # ---- Custom track support ----
+    track_spec = race_cfg.get("track")  # None = default random, or a track spec dict
+    track_name = ""
 
-    # AI: wrapped discrete env for model inference + separate raw env for display
+    if track_spec:
+        from src.env.custom_track import CustomTrackCarRacing
+        track_name = track_spec.get("name", "Custom")
+        logger.info("Using custom track: %s", track_name)
+
+        human_env = CustomTrackCarRacing(
+            track_spec, continuous=True, render_mode="rgb_array",
+            max_episode_steps=max_time * fps,
+        )
+        human_env.reset(seed=seed)
+
+        ai_display_env = CustomTrackCarRacing(
+            track_spec, continuous=True, render_mode="rgb_array",
+            max_episode_steps=max_time * fps,
+        )
+        ai_display_env.reset(seed=seed)
+    else:
+        # ---- Environments ----
+        # Human: raw continuous env (no wrappers, no frame skip) for real gameplay
+        human_env = make_race_env(seed=seed, continuous=True, max_episode_steps=max_time * fps)
+
+        # Raw continuous env for AI display
+        ai_display_env = make_race_env(seed=seed, continuous=True, max_episode_steps=max_time * fps)
+
+    # AI: wrapped discrete env for model inference
     # Override max_episode_steps for race mode — training config has 1000 which is too low
     race_env_cfg = {**env_cfg}
     race_env_cfg["environment"] = {
@@ -85,12 +127,13 @@ def run_race(
         "max_episode_steps": max_time * fps,
     }
     ai_env = make_env(race_env_cfg, seed=seed, render=False)
-    # Raw continuous env for AI display — receives converted continuous actions
-    ai_display_env = make_race_env(seed=seed, continuous=True, max_episode_steps=max_time * fps)
 
     # Controllers
     human_ctrl = HumanController(race_cfg.get("controls")) if mode != "ai_only" else None
     ai_ctrl = AIController(r["ai_model_path"], train_cfg, env_cfg) if mode != "human_only" else None
+
+    # Theme
+    theme = race_cfg.get("theme")
 
     # Renderer
     renderer = RaceRenderer(
@@ -98,6 +141,8 @@ def run_race(
         height=d.get("window_height", 600),
         show_hud=d.get("show_hud", True),
         fps=fps,
+        theme=theme,
+        track_name=track_name,
     )
 
     # Metrics
@@ -166,6 +211,14 @@ def run_race(
             h_progress = _get_track_progress(human_env)
             a_progress = _get_track_progress(ai_display_env)
 
+            # Car world positions for same-screen rendering
+            h_pose = _get_car_pose(human_env)
+            a_pose = _get_car_pose(ai_display_env)
+
+            # Get track waypoints once for minimap
+            if step == 0:
+                track_pts = _get_track_waypoints(human_env)
+
             # --- Lap detection ---
             # CarRacing terminates when all tiles are visited (progress ~1.0).
             # A "lap" = env terminated/fully visited. Reset the env for next lap.
@@ -214,6 +267,7 @@ def run_race(
                     "track_pct": round(h_overall_pct, 1),
                     "elapsed": round(elapsed, 1),
                     "lap": f"{h_laps + 1}/{n_laps}" if not h_finished else f"{n_laps}/{n_laps} DONE",
+                    "pose": h_pose,
                 },
                 ai_metrics={
                     **ai_metrics.summary(),
@@ -222,7 +276,9 @@ def run_race(
                     "track_pct": round(a_overall_pct, 1),
                     "elapsed": round(elapsed, 1),
                     "lap": f"{a_laps + 1}/{n_laps}" if not a_finished else f"{n_laps}/{n_laps} DONE",
+                    "pose": a_pose,
                 },
+                track_pts=track_pts if step == 0 else None,
             )
 
             step += 1

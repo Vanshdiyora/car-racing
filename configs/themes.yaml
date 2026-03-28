@@ -1,0 +1,112 @@
+# ============================================================
+# UI Theme Configuration
+# ============================================================
+# Customize colours, fonts, and layout for the race UI.
+# Switch themes via: python -m src.main race --theme night
+# ============================================================
+
+themes:
+
+  # ---- Default theme ----
+  default:
+    name: "Default"
+    background: [20, 20, 20]
+    hud_bar: [15, 15, 15]
+    hud_text: [200, 200, 200]
+    position_bar_bg: [15, 15, 30]
+    track_bar: [50, 50, 50]
+    human_color: [80, 180, 255]       # blue accents for human
+    ai_color: [255, 80, 80]           # red accents for AI
+    speed_fast: [80, 255, 80]
+    speed_medium: [255, 255, 80]
+    speed_slow: [255, 80, 80]
+    positive_score: [80, 255, 80]
+    negative_score: [255, 80, 80]
+    grass_warning: [255, 50, 50]
+    pip_border: [255, 100, 100]
+    timer: [255, 255, 100]
+    ahead: [80, 255, 80]
+    behind: [255, 80, 80]
+    tied: [255, 255, 100]
+    font_family: "consolas"
+    font_size_small: 14
+    font_size_medium: 20
+    font_size_large: 36
+
+  # ---- Night mode ----
+  night:
+    name: "Night Mode"
+    background: [5, 5, 15]
+    hud_bar: [10, 10, 20]
+    hud_text: [160, 160, 180]
+    position_bar_bg: [10, 10, 25]
+    track_bar: [30, 30, 50]
+    human_color: [100, 150, 255]
+    ai_color: [255, 60, 60]
+    speed_fast: [60, 200, 60]
+    speed_medium: [200, 200, 60]
+    speed_slow: [200, 60, 60]
+    positive_score: [60, 200, 60]
+    negative_score: [200, 60, 60]
+    grass_warning: [255, 30, 30]
+    pip_border: [200, 60, 60]
+    timer: [200, 200, 80]
+    ahead: [60, 200, 60]
+    behind: [200, 60, 60]
+    tied: [200, 200, 80]
+    font_family: "consolas"
+    font_size_small: 14
+    font_size_medium: 20
+    font_size_large: 36
+
+  # ---- Retro arcade ----
+  retro:
+    name: "Retro Arcade"
+    background: [0, 0, 0]
+    hud_bar: [0, 0, 0]
+    hud_text: [0, 255, 0]
+    position_bar_bg: [0, 0, 0]
+    track_bar: [0, 80, 0]
+    human_color: [0, 255, 255]
+    ai_color: [255, 0, 255]
+    speed_fast: [0, 255, 0]
+    speed_medium: [255, 255, 0]
+    speed_slow: [255, 0, 0]
+    positive_score: [0, 255, 0]
+    negative_score: [255, 0, 0]
+    grass_warning: [255, 0, 0]
+    pip_border: [255, 0, 255]
+    timer: [255, 255, 0]
+    ahead: [0, 255, 0]
+    behind: [255, 0, 0]
+    tied: [255, 255, 0]
+    font_family: "courier new"
+    font_size_small: 14
+    font_size_medium: 20
+    font_size_large: 36
+
+  # ---- Neon ----
+  neon:
+    name: "Neon"
+    background: [10, 0, 20]
+    hud_bar: [15, 0, 30]
+    hud_text: [220, 180, 255]
+    position_bar_bg: [15, 0, 30]
+    track_bar: [40, 0, 60]
+    human_color: [0, 200, 255]
+    ai_color: [255, 0, 150]
+    speed_fast: [0, 255, 200]
+    speed_medium: [255, 200, 0]
+    speed_slow: [255, 50, 80]
+    positive_score: [0, 255, 200]
+    negative_score: [255, 50, 80]
+    grass_warning: [255, 0, 100]
+    pip_border: [255, 0, 150]
+    timer: [255, 255, 0]
+    ahead: [0, 255, 200]
+    behind: [255, 50, 80]
+    tied: [255, 200, 0]
+    font_family: "consolas"
+    font_size_small: 14
+    font_size_medium: 20
+    font_size_large: 36

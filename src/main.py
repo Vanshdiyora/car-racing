@@ -34,6 +34,10 @@ def build_parser() -> argparse.ArgumentParser:
     p_race.add_argument("--env-config", default="configs/env_config.yaml")
     p_race.add_argument("--train-config", default="configs/train_config.yaml")
     p_race.add_argument("--seed", type=int, default=None, help="Track seed (overrides config). Omit for random.")
+    p_race.add_argument("--track", type=str, default=None, help="Custom track name from configs/tracks.yaml (e.g. oval, monaco, monza)")
+    p_race.add_argument("--tracks-file", default="configs/tracks.yaml", help="Path to tracks definition YAML")
+    p_race.add_argument("--theme", type=str, default=None, help="UI theme: default, night, retro, neon")
+    p_race.add_argument("--themes-file", default="configs/themes.yaml", help="Path to themes YAML")
 
     # ---- benchmark ----
     p_bench = sub.add_parser("benchmark", help="Run benchmark comparison")
@@ -109,19 +113,52 @@ def _cmd_eval(args: argparse.Namespace) -> None:
 
 
 def _cmd_race(args: argparse.Namespace) -> None:
+    import yaml
     from src.race.race_engine import run_race
     from src.utils import load_env_config, load_race_config, load_train_config, setup_logger
 
     setup_logger("car_racing")
     race_cfg = load_race_config(args.race_config)
+
     if args.seed is not None:
         race_cfg.setdefault("race", {})["seed"] = args.seed
+
+    # Load custom track if specified
+    if args.track:
+        import pathlib
+        tracks_path = pathlib.Path(args.tracks_file)
+        if not tracks_path.exists():
+            print(f"Error: tracks file not found: {tracks_path}")
+            return
+        with open(tracks_path) as f:
+            tracks_data = yaml.safe_load(f)
+        all_tracks = tracks_data.get("tracks", {})
+        if args.track not in all_tracks:
+            print(f"Error: track '{args.track}' not found. Available: {', '.join(all_tracks.keys())}")
+            return
+        race_cfg["track"] = all_tracks[args.track]
+        print(f"Track: {all_tracks[args.track].get('name', args.track)}")
+
+    # Load theme if specified
+    if args.theme:
+        import pathlib
+        themes_path = pathlib.Path(args.themes_file)
+        if themes_path.exists():
+            with open(themes_path) as f:
+                themes_data = yaml.safe_load(f)
+            all_themes = themes_data.get("themes", {})
+            if args.theme in all_themes:
+                race_cfg["theme"] = all_themes[args.theme]
+                print(f"Theme: {all_themes[args.theme].get('name', args.theme)}")
+            else:
+                print(f"Warning: theme '{args.theme}' not found. Available: {', '.join(all_themes.keys())}")
+
     results = run_race(
         race_cfg=race_cfg,
         env_cfg=load_env_config(args.env_config),
         train_cfg=load_train_config(args.train_config),
     )
-    print(f"\n🏁 Race complete! Winner: {results['winner'].upper()}")
+    print(f"\nRace complete! Winner: {results['winner'].upper()}")
     print(f"   Human score: {results['human_score']:.0f}")
     print(f"   AI score:    {results['ai_score']:.0f}")
 
