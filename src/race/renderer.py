@@ -109,7 +109,7 @@ class RaceRenderer:
     # Internal helpers
     # ------------------------------------------------------------------
 
-    def _array_to_surface(self, arr: np.ndarray, size: tuple[int, int]) -> pygame.Surface:
+    def _array_to_surface(self, arr: np.ndarray, size: tuple[int, int]) -> Any:
         """Convert a numpy RGB array to a scaled Pygame surface."""
         if arr.dtype == np.float32 or arr.dtype == np.float64:
             arr = (arr * 255).clip(0, 255).astype(np.uint8)
