@@ -1,0 +1,45 @@
+# FAST training config — optimised for speed (~1-2 hours instead of 15)
+#
+# Key changes vs default:
+#   - 500K timesteps (enough for CarRacing to converge)
+#   - Larger batch size (better GPU utilisation)
+#   - Fewer PPO epochs (4 vs 10)
+#   - 8 parallel envs (2x faster collection)
+#   - Less frequent & cheaper evaluation
+#   - Less frequent checkpointing
+#
+# Usage:
+#   python -m src.main train --train-config configs/train_fast.yaml --n-envs 8
+
+training:
+  algorithm: "PPO"
+  total_timesteps: 500_000
+  learning_rate: 2.5e-4
+  n_steps: 1024              # shorter rollouts = faster iterations
+  batch_size: 256             # larger batches = better GPU throughput
+  n_epochs: 4                 # fewer epochs = less compute per rollout
+  gamma: 0.99
+  gae_lambda: 0.95
+  clip_range: 0.2
+  clip_range_vf: null
+  ent_coef: 0.01
+  vf_coef: 0.5
+  max_grad_norm: 0.5
+  normalize_advantage: true
+  seed: 42
+  device: "auto"
+
+checkpoints:
+  save_dir: "models/ppo_baseline"
+  save_freq: 100_000          # save less often
+  best_model_dir: "models/ppo_best"
+
+logging:
+  tensorboard_dir: "logs/tensorboard"
+  csv_path: "logs/training_logs.csv"
+  log_interval: 10
+
+evaluation:
+  eval_freq: 50_000           # evaluate less often (was 20K)
+  n_eval_episodes: 3          # fewer eval episodes (was 10)
+  deterministic: true

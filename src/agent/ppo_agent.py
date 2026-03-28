@@ -117,12 +117,23 @@ class PPOAgent:
 
         self.device = get_device(t.get("device", "auto"))
         self.n_actions = n_actions
+        self._use_amp = self.device.type == "cuda"  # mixed-precision on GPU
 
         in_channels = p.get("frame_stack", 4)
         self.policy = ActorCriticPolicy(in_channels, n_actions).to(self.device)
+
+        # torch.compile for ~20-40% speedup (PyTorch 2.0+)
+        if hasattr(torch, "compile") and self.device.type == "cuda":
+            try:
+                self.policy = torch.compile(self.policy)  # type: ignore[assignment]
+                logger.info("torch.compile enabled — expect faster training")
+            except Exception:
+                logger.debug("torch.compile not available, skipping")
+
         self.optimizer = torch.optim.Adam(
             self.policy.parameters(), lr=t.get("learning_rate", 3e-4), eps=1e-5
         )
+        self._scaler = torch.amp.GradScaler("cuda", enabled=self._use_amp)
 
         resize = tuple(p.get("resize", [84, 84]))
         obs_shape = (*resize, in_channels)
@@ -183,22 +194,27 @@ class PPOAgent:
         for _ in range(self.n_epochs):
             for idx in self.buffer.get_batches(self.batch_size, self.rng):
                 b = torch.as_tensor(idx, device=self.device).long()
-                _, new_lp, entropy, new_val = self.policy.get_action_and_value(
-                    obs_all[b], actions_all[b]
-                )
 
-                ratio = torch.exp(new_lp - old_log_probs[b])
-                pg1 = ratio * advantages[b]
-                pg2 = torch.clamp(ratio, 1 - self.clip_range, 1 + self.clip_range) * advantages[b]
-                pg_loss = -torch.min(pg1, pg2).mean()
-                vf_loss = torch.nn.functional.mse_loss(new_val, returns[b])
-                ent_loss = -entropy.mean()
-                loss = pg_loss + self.vf_coef * vf_loss + self.ent_coef * ent_loss
+                # Mixed-precision forward pass (AMP) — ~30% faster on GPU
+                with torch.amp.autocast("cuda", enabled=self._use_amp):
+                    _, new_lp, entropy, new_val = self.policy.get_action_and_value(
+                        obs_all[b], actions_all[b]
+                    )
+
+                    ratio = torch.exp(new_lp - old_log_probs[b])
+                    pg1 = ratio * advantages[b]
+                    pg2 = torch.clamp(ratio, 1 - self.clip_range, 1 + self.clip_range) * advantages[b]
+                    pg_loss = -torch.min(pg1, pg2).mean()
+                    vf_loss = torch.nn.functional.mse_loss(new_val, returns[b])
+                    ent_loss = -entropy.mean()
+                    loss = pg_loss + self.vf_coef * vf_loss + self.ent_coef * ent_loss
 
                 self.optimizer.zero_grad()
-                loss.backward()
+                self._scaler.scale(loss).backward()
+                self._scaler.unscale_(self.optimizer)
                 torch.nn.utils.clip_grad_norm_(self.policy.parameters(), self.max_grad_norm)
-                self.optimizer.step()
+                self._scaler.step(self.optimizer)
+                self._scaler.update()
 
                 stats["loss"] += loss.item()
                 stats["pg_loss"] += pg_loss.item()

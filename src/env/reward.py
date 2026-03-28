@@ -34,11 +34,13 @@ class RewardShaper(gym.Wrapper):
         self._tile_bonus = tile_visit_bonus
         self._prev_tiles: int = 0
         self._step_count: int = 0
+        self._car_env_cache: Any = None  # cached unwrapped env reference
 
     def reset(self, *, seed: int | None = None, options: dict[str, Any] | None = None):
         obs, info = self.env.reset(seed=seed, options=options)
         self._prev_tiles = 0
         self._step_count = 0
+        self._car_env_cache = self._unwrap_car_env()  # refresh on reset
         return obs, info
 
     def step(self, action: Any) -> tuple[NDArray, SupportsFloat, bool, bool, dict[str, Any]]:
@@ -46,8 +48,8 @@ class RewardShaper(gym.Wrapper):
         self._step_count += 1
         shaped_reward = float(base_reward)
 
-        # Access the underlying CarRacing env to read car state
-        car_env = self._unwrap_car_env()
+        # Use cached reference instead of walking wrapper chain every step
+        car_env = self._car_env_cache
         if car_env is not None:
             car = getattr(car_env, "car", None)
             if car is not None:
