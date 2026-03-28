@@ -1,0 +1,21 @@
+# Environment configuration
+environment:
+  name: "CarRacing-v3"
+  continuous: false
+  render_mode: null             # null for training, "human" for visualisation
+  max_episode_steps: 1000
+
+preprocessing:
+  grayscale: true
+  resize: [84, 84]
+  frame_stack: 4
+  frame_skip: 4
+  normalize: true               # scale pixels to [0, 1]
+
+reward_shaping:
+  enabled: true
+  speed_reward_weight: 0.1      # bonus for high speed
+  grass_penalty: -0.5           # penalty for going on grass
+  backward_penalty: -1.0        # penalty for driving backward
+  standing_still_penalty: -0.1  # penalty per step when barely moving
+  tile_visit_bonus: 1.0         # bonus for visiting new track tiles
