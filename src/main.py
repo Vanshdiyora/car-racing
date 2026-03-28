@@ -33,6 +33,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_race.add_argument("--race-config", default="configs/race_config.yaml")
     p_race.add_argument("--env-config", default="configs/env_config.yaml")
     p_race.add_argument("--train-config", default="configs/train_config.yaml")
+    p_race.add_argument("--seed", type=int, default=None, help="Track seed (overrides config). Omit for random.")
 
     # ---- benchmark ----
     p_bench = sub.add_parser("benchmark", help="Run benchmark comparison")
@@ -112,8 +113,11 @@ def _cmd_race(args: argparse.Namespace) -> None:
     from src.utils import load_env_config, load_race_config, load_train_config, setup_logger
 
     setup_logger("car_racing")
+    race_cfg = load_race_config(args.race_config)
+    if args.seed is not None:
+        race_cfg.setdefault("race", {})["seed"] = args.seed
     results = run_race(
-        race_cfg=load_race_config(args.race_config),
+        race_cfg=race_cfg,
         env_cfg=load_env_config(args.env_config),
         train_cfg=load_train_config(args.train_config),
     )

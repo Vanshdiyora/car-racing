@@ -5,12 +5,13 @@ race:
   n_laps: 3
   max_time_seconds: 300
   fps: 60
+  seed: random                   # fixed int for same track, or "random" for a new track each race
 
 display:
-  window_width: 1200
-  window_height: 600
-  split_screen: true            # side-by-side view
-  show_hud: true                # speed, lap, timer overlay
+  window_width: 1000
+  window_height: 700
+  split_screen: false           # single-view with AI picture-in-picture
+  show_hud: true                # speed, position, timer overlay
   show_minimap: false
 
 controls:

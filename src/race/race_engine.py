@@ -64,8 +64,13 @@ def run_race(
     d = race_cfg.get("display", {})
     s = race_cfg.get("scoring", {})
     mode = r.get("mode", "human_vs_ai")
-    seed = 42
+    seed_cfg = r.get("seed", "random")
+    if seed_cfg == "random" or seed_cfg is None:
+        seed = int(np.random.default_rng().integers(0, 100_000))
+    else:
+        seed = int(seed_cfg)
     fps = r.get("fps", 60)
+    logger.info("Track seed: %d", seed)
     max_time = r.get("max_time_seconds", 300)
 
     # ---- Environments ----
@@ -73,7 +78,13 @@ def run_race(
     human_env = make_race_env(seed=seed, continuous=True, max_episode_steps=max_time * fps)
 
     # AI: wrapped discrete env for model inference + separate raw env for display
-    ai_env = make_env(env_cfg, seed=seed, render=False)
+    # Override max_episode_steps for race mode — training config has 1000 which is too low
+    race_env_cfg = {**env_cfg}
+    race_env_cfg["environment"] = {
+        **env_cfg.get("environment", {}),
+        "max_episode_steps": max_time * fps,
+    }
+    ai_env = make_env(race_env_cfg, seed=seed, render=False)
     # Raw continuous env for AI display — receives converted continuous actions
     ai_display_env = make_race_env(seed=seed, continuous=True, max_episode_steps=max_time * fps)
 
@@ -98,10 +109,19 @@ def run_race(
     a_obs, _ = ai_env.reset(seed=seed)
 
     max_steps = max_time * fps
+    n_laps = r.get("n_laps", 3)
     step = 0
     race_start = time.time()
 
-    logger.info("Race started! Mode=%s  max_steps=%d", mode, max_steps)
+    # Lap tracking — a "lap" = visiting all track tiles once (progress resets)
+    h_prev_progress = 0.0
+    a_prev_progress = 0.0
+    h_laps = 0
+    a_laps = 0
+    h_finished = False
+    a_finished = False
+
+    logger.info("Race started! Mode=%s  laps=%d  max_steps=%d", mode, n_laps, max_steps)
 
     # Discrete action lookup for AI display env (maps discrete int → continuous)
     _DISCRETE_TO_CONT = {
@@ -146,6 +166,28 @@ def run_race(
             h_progress = _get_track_progress(human_env)
             a_progress = _get_track_progress(ai_display_env)
 
+            # --- Lap detection ---
+            # CarRacing terminates when all tiles are visited (progress ~1.0).
+            # A "lap" = env terminated/fully visited. Reset the env for next lap.
+            if h_term and not h_finished:
+                h_laps += 1
+                human_metrics.finish_lap()
+                if h_laps >= n_laps:
+                    h_finished = True
+                    logger.info("Human finished %d laps!", n_laps)
+                else:
+                    h_obs, _ = human_env.reset(seed=seed)
+
+            if a_term and not a_finished:
+                a_laps += 1
+                ai_metrics.finish_lap()
+                if a_laps >= n_laps:
+                    a_finished = True
+                    logger.info("AI finished %d laps!", n_laps)
+                else:
+                    a_obs, _ = ai_env.reset(seed=seed)
+                    ai_display_env.reset(seed=seed)
+
             # Use base CarRacing reward only (no shaping) for fair comparison
             human_metrics.record_step(float(h_reward), on_grass=h_on_grass)
             ai_metrics.record_step(float(a_info.get("base_reward", a_reward)), on_grass=a_on_grass)
@@ -158,6 +200,10 @@ def run_race(
 
             elapsed = time.time() - race_start
 
+            # Overall progress including completed laps
+            h_overall_pct = (h_laps * 100.0 + h_progress * 100.0) / n_laps
+            a_overall_pct = (a_laps * 100.0 + a_progress * 100.0) / n_laps
+
             renderer.render_frame(
                 human_frame=h_frame,
                 ai_frame=a_frame,
@@ -165,22 +211,24 @@ def run_race(
                     **human_metrics.summary(),
                     "speed": round(h_speed, 1),
                     "on_grass": h_on_grass,
-                    "track_pct": round(h_progress * 100, 1),
+                    "track_pct": round(h_overall_pct, 1),
                     "elapsed": round(elapsed, 1),
+                    "lap": f"{h_laps + 1}/{n_laps}" if not h_finished else f"{n_laps}/{n_laps} DONE",
                 },
                 ai_metrics={
                     **ai_metrics.summary(),
                     "speed": round(a_speed, 1),
                     "on_grass": a_on_grass,
-                    "track_pct": round(a_progress * 100, 1),
+                    "track_pct": round(a_overall_pct, 1),
                     "elapsed": round(elapsed, 1),
+                    "lap": f"{a_laps + 1}/{n_laps}" if not a_finished else f"{n_laps}/{n_laps} DONE",
                 },
             )
 
             step += 1
 
-            # Only end when BOTH are done (let the other keep going)
-            if (h_term or h_trunc) and (a_term or a_trunc):
+            # Race ends when BOTH have finished all laps, or time runs out
+            if h_finished and a_finished:
                 break
 
     except KeyboardInterrupt:
