@@ -74,8 +74,8 @@ def run_race(
 
     # AI: wrapped discrete env for model inference + separate raw env for display
     ai_env = make_env(env_cfg, seed=seed, render=False)
-    # We also need a raw AI env that is in sync for RGB display
-    ai_display_env = make_race_env(seed=seed, continuous=False, max_episode_steps=max_time * fps)
+    # Raw continuous env for AI display — receives converted continuous actions
+    ai_display_env = make_race_env(seed=seed, continuous=True, max_episode_steps=max_time * fps)
 
     # Controllers
     human_ctrl = HumanController(race_cfg.get("controls")) if mode != "ai_only" else None
