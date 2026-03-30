@@ -96,7 +96,7 @@ def _cmd_eval(args: argparse.Namespace) -> None:
     n_actions = tmp.action_space.n  # type: ignore[union-attr]
     tmp.close()
 
-    agent = PPOAgent(train_cfg, env_cfg, n_actions)
+    agent = PPOAgent(train_cfg, env_cfg, n_actions, compile_policy=False)
     agent.load(args.checkpoint)
 
     results = evaluate_with_details(

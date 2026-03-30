@@ -100,7 +100,7 @@ class RolloutBuffer:
 class PPOAgent:
     """Production-ready PPO agent for discrete CarRacing."""
 
-    def __init__(self, train_cfg: dict[str, Any], env_cfg: dict[str, Any], n_actions: int) -> None:
+    def __init__(self, train_cfg: dict[str, Any], env_cfg: dict[str, Any], n_actions: int, *, compile_policy: bool = True) -> None:
         t = train_cfg.get("training", {})
         p = env_cfg.get("preprocessing", {})
 
@@ -122,8 +122,8 @@ class PPOAgent:
         in_channels = p.get("frame_stack", 4)
         self.policy = ActorCriticPolicy(in_channels, n_actions).to(self.device)
 
-        # torch.compile for ~20-40% speedup (PyTorch 2.0+)
-        if hasattr(torch, "compile") and self.device.type == "cuda":
+        # torch.compile for ~20-40% speedup (PyTorch 2.0+) — skip for eval/race
+        if compile_policy and hasattr(torch, "compile") and self.device.type == "cuda":
             try:
                 self.policy = torch.compile(self.policy)  # type: ignore[assignment]
                 logger.info("torch.compile enabled — expect faster training")

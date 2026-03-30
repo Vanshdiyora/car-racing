@@ -25,7 +25,7 @@ class AIController:
         n_actions = tmp.action_space.n  # type: ignore[union-attr]
         tmp.close()
 
-        self.agent = PPOAgent(train_cfg, env_cfg, n_actions)
+        self.agent = PPOAgent(train_cfg, env_cfg, n_actions, compile_policy=False)
         self.agent.load(checkpoint)
         self.agent.policy.eval()
 
