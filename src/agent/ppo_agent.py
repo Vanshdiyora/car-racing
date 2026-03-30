@@ -245,7 +245,10 @@ class PPOAgent:
 
     def load(self, path: str | pathlib.Path) -> None:
         data = torch.load(path, map_location=self.device, weights_only=True)
-        self.policy.load_state_dict(data["policy"])
+        # Strip _orig_mod. prefix added by torch.compile() if present
+        policy_sd = data["policy"]
+        policy_sd = {k.replace("_orig_mod.", ""): v for k, v in policy_sd.items()}
+        self.policy.load_state_dict(policy_sd)
         self.optimizer.load_state_dict(data["optimizer"])
         self._update_count = data.get("update_count", 0)
         logger.info("Loaded PPO checkpoint ← %s (updates=%d)", path, self._update_count)
