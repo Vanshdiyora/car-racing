@@ -3,7 +3,7 @@ environment:
   name: "CarRacing-v3"
   continuous: false
   render_mode: null             # null for training, "human" for visualisation
-  max_episode_steps: 1000
+  max_episode_steps: 5000
 
 preprocessing:
   grayscale: true
