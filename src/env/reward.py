@@ -26,6 +26,8 @@ class RewardShaper(gym.Wrapper):
         standing_still_penalty: float = -0.1,
         tile_visit_bonus: float = 1.0,
         spin_penalty: float = -0.5,
+        drift_penalty: float = -0.4,
+        highspeed_turn_penalty: float = -0.3,
     ) -> None:
         super().__init__(env)
         self._speed_w = speed_reward_weight
@@ -34,6 +36,8 @@ class RewardShaper(gym.Wrapper):
         self._still_pen = standing_still_penalty
         self._tile_bonus = tile_visit_bonus
         self._spin_pen = spin_penalty
+        self._drift_pen = drift_penalty
+        self._hs_turn_pen = highspeed_turn_penalty
         self._prev_tiles: int = 0
         self._step_count: int = 0
         self._car_env_cache: Any = None  # cached unwrapped env reference
@@ -82,6 +86,17 @@ class RewardShaper(gym.Wrapper):
                 angular_vel = abs(car.hull.angularVelocity)
                 if angular_vel > 0.5:
                     shaped_reward += self._spin_pen * min(angular_vel / 3.0, 1.0)
+
+                # Drift penalty: lateral slip at speed
+                lateral_speed = abs(vx * forward_y - vy * forward_x)
+                if speed > 10.0 and lateral_speed > 2.0:
+                    drift_ratio = min(lateral_speed / speed, 1.0)
+                    shaped_reward += self._drift_pen * drift_ratio
+
+                # High-speed turn penalty
+                if speed > 30.0 and angular_vel > 0.3:
+                    severity = min(angular_vel / 2.0, 1.0) * min(speed / 60.0, 1.0)
+                    shaped_reward += self._hs_turn_pen * severity
 
                 # Grass detection — wheel.tiles is empty when on grass
                 on_grass = any(

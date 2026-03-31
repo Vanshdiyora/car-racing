@@ -46,6 +46,14 @@ _GAS_DECAY = 0.15        # how fast gas falls off
 _BRAKE_SPEED = 0.15      # brake ramp up
 _BRAKE_DECAY = 0.20      # brake ramp down
 
+# Speed-aware driving parameters
+_HIGH_SPEED_THRESHOLD = 40.0   # above this, steering is progressively reduced
+_MAX_SPEED_FOR_SCALE = 80.0    # speed at which steering is most limited
+_MIN_STEER_SCALE = 0.35        # minimum steering multiplier at top speed
+_TURN_GAS_CUT = 0.6            # gas multiplied by this when steering hard
+_TURN_AUTO_BRAKE_STEER = 0.45  # steering magnitude above which auto-brake kicks in
+_TURN_AUTO_BRAKE_FORCE = 0.3   # auto-brake strength during sharp high-speed turns
+
 
 class HumanController:
     """Read keyboard input and produce smooth continuous actions."""
@@ -68,8 +76,15 @@ class HumanController:
         self._left = _KEY_LOOKUP.get(self._map["steer_left"])
         self._right = _KEY_LOOKUP.get(self._map["steer_right"])
 
-    def get_action(self) -> np.ndarray:
-        """Poll key state and return continuous action [steering, gas, brake]."""
+    def get_action(self, speed: float = 0.0) -> np.ndarray:
+        """Poll key state and return continuous action [steering, gas, brake].
+
+        Parameters
+        ----------
+        speed : float
+            Current car speed (world units). Used to reduce steering
+            sensitivity and apply auto-braking at high speed during turns.
+        """
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 self.quit_requested = True
@@ -104,4 +119,30 @@ class HumanController:
         else:
             self._brake = max(0.0, self._brake - _BRAKE_DECAY)
 
-        return np.array([self._steer, self._gas, self._brake], dtype=np.float32)
+        # --- Speed-aware adjustments ---
+        steer_out = self._steer
+        gas_out = self._gas
+        brake_out = self._brake
+        abs_steer = abs(self._steer)
+
+        if speed > _HIGH_SPEED_THRESHOLD:
+            # 1) Reduce effective steering at high speed to prevent drift
+            speed_ratio = min((speed - _HIGH_SPEED_THRESHOLD)
+                              / (_MAX_SPEED_FOR_SCALE - _HIGH_SPEED_THRESHOLD), 1.0)
+            steer_scale = 1.0 - speed_ratio * (1.0 - _MIN_STEER_SCALE)
+            steer_out = self._steer * steer_scale
+
+            # 2) Cut gas when turning at high speed
+            if abs_steer > 0.15:
+                turn_factor = min(abs_steer / 0.8, 1.0)  # 0→1 over steering range
+                gas_cut = 1.0 - turn_factor * (1.0 - _TURN_GAS_CUT)
+                gas_out *= gas_cut
+
+            # 3) Auto-brake during sharp turns at high speed
+            if abs_steer > _TURN_AUTO_BRAKE_STEER:
+                turn_severity = min((abs_steer - _TURN_AUTO_BRAKE_STEER)
+                                    / (1.0 - _TURN_AUTO_BRAKE_STEER), 1.0)
+                auto_brake = turn_severity * speed_ratio * _TURN_AUTO_BRAKE_FORCE
+                brake_out = max(brake_out, auto_brake)
+
+        return np.array([steer_out, gas_out, brake_out], dtype=np.float32)

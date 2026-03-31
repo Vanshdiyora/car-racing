@@ -181,7 +181,8 @@ def run_race(
         while step < max_steps:
             # --- Human action (continuous) ---
             if human_ctrl is not None:
-                h_action = human_ctrl.get_action()
+                h_speed_now = _get_car_speed(human_env)
+                h_action = human_ctrl.get_action(speed=h_speed_now)
                 if human_ctrl.quit_requested:
                     break
             else:

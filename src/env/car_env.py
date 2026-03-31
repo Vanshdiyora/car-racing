@@ -57,6 +57,8 @@ def make_env(
             standing_still_penalty=r.get("standing_still_penalty", -0.1),
             tile_visit_bonus=r.get("tile_visit_bonus", 1.0),
             spin_penalty=r.get("spin_penalty", -0.5),
+            drift_penalty=r.get("drift_penalty", -0.4),
+            highspeed_turn_penalty=r.get("highspeed_turn_penalty", -0.3),
         )
 
     # Pixel preprocessing
