@@ -99,13 +99,13 @@ def _cmd_eval(args: argparse.Namespace) -> None:
     agent = PPOAgent(train_cfg, env_cfg, n_actions, compile_policy=False)
     agent.load(args.checkpoint)
 
-    results = evaluate_with_details(
-        agent, env_cfg, n_episodes=args.episodes, deterministic=True
-    )
-    print(f"\nEvaluation over {args.episodes} episodes:")
-    print(f"  Mean reward : {results['mean_reward']:.1f} ± {results['std_reward']:.1f}")
-    print(f"  Min / Max   : {results['min_reward']:.1f} / {results['max_reward']:.1f}")
-    print(f"  Mean steps  : {results['mean_steps']:.0f}")
+    # results = evaluate_with_details(
+    #     agent, env_cfg, n_episodes=args.episodes, deterministic=True
+    # )
+    # print(f"\nEvaluation over {args.episodes} episodes:")
+    # print(f"  Mean reward : {results['mean_reward']:.1f} ± {results['std_reward']:.1f}")
+    # print(f"  Min / Max   : {results['min_reward']:.1f} / {results['max_reward']:.1f}")
+    # print(f"  Mean steps  : {results['mean_steps']:.0f}")
 
     if args.render:
         from src.evaluate.evaluate import evaluate_agent
