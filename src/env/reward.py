@@ -25,6 +25,7 @@ class RewardShaper(gym.Wrapper):
         backward_penalty: float = -1.0,
         standing_still_penalty: float = -0.1,
         tile_visit_bonus: float = 1.0,
+        spin_penalty: float = -0.5,
     ) -> None:
         super().__init__(env)
         self._speed_w = speed_reward_weight
@@ -32,6 +33,7 @@ class RewardShaper(gym.Wrapper):
         self._backward_pen = backward_penalty
         self._still_pen = standing_still_penalty
         self._tile_bonus = tile_visit_bonus
+        self._spin_pen = spin_penalty
         self._prev_tiles: int = 0
         self._step_count: int = 0
         self._car_env_cache: Any = None  # cached unwrapped env reference
@@ -53,13 +55,33 @@ class RewardShaper(gym.Wrapper):
         if car_env is not None:
             car = getattr(car_env, "car", None)
             if car is not None:
-                # Speed bonus: encourage the agent to maintain speed
-                speed = np.sqrt(car.hull.linearVelocity[0] ** 2 + car.hull.linearVelocity[1] ** 2)
-                shaped_reward += self._speed_w * min(speed, 50.0) / 50.0
+                vx, vy = car.hull.linearVelocity
+                speed = np.sqrt(vx ** 2 + vy ** 2)
+
+                # Car heading vector (forward direction)
+                angle = car.hull.angle
+                forward_x = -np.sin(angle)
+                forward_y = np.cos(angle)
+
+                # Dot product: positive = moving forward, negative = backward
+                forward_speed = vx * forward_x + vy * forward_y
+
+                # Speed bonus: only reward *forward* speed
+                if forward_speed > 0:
+                    shaped_reward += self._speed_w * min(forward_speed, 50.0) / 50.0
+
+                # Backward penalty: penalise when car is moving backward
+                if forward_speed < -1.0:
+                    shaped_reward += self._backward_pen
 
                 # Standing still penalty
                 if speed < 1.0 and self._step_count > 10:
                     shaped_reward += self._still_pen
+
+                # Spin penalty: penalise high angular velocity (U-turns)
+                angular_vel = abs(car.hull.angularVelocity)
+                if angular_vel > 0.5:
+                    shaped_reward += self._spin_pen * min(angular_vel / 3.0, 1.0)
 
                 # Grass detection — wheel.tiles is empty when on grass
                 on_grass = any(
